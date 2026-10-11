@@ -9,19 +9,38 @@ DIRS = {pygame.K_UP: (-1, 0), pygame.K_DOWN: (1, 0), pygame.K_LEFT: (0, -1), pyg
 MOVE_DELAY, ENEMY_DELAY, PUMP_RANGE, DEFLATE_AFTER = 0.11, 0.35, 3, 1.5
 
 
+PARTICLES = []
+
+
 def dirt_color(row):
     """Return an (r, g, b) colour for dirt in the given row, or None for the default gradient."""
-    pass
+    bands = [
+        (210, 160, 90),   # Top soil (rows 1-3)
+        (180, 115, 65),   # Mid clay (rows 4-6)
+        (145, 80, 45),    # Deep earth (rows 7-9)
+        (105, 55, 35),    # Bedrock layer (rows 10+)
+    ]
+    return bands[min((row - 1) // 3, len(bands) - 1)]
 
 
 def on_enemy_popped(enemy, score):
     """Called when an enemy is popped; add particles, bonus points, or a colour flash here."""
-    pass
+    cx = enemy.cell[1] * TILE + TILE // 2
+    cy = enemy.cell[0] * TILE + TILE // 2
+    for _ in range(16):
+        PARTICLES.append({
+            "x": float(cx),
+            "y": float(cy),
+            "vx": random.uniform(-120, 120),
+            "vy": random.uniform(-120, 120),
+            "life": random.uniform(0.3, 0.6),
+            "color": random.choice([(255, 90, 90), (255, 220, 90), (255, 150, 60), (255, 255, 255)]),
+        })
 
 
 def enemy_speed_multiplier(level):
     """Return a speed multiplier for enemies at the given level, or None for the default speed."""
-    pass
+    return 1 + 0.1 * level
 
 
 def in_bounds(r, c):
@@ -31,7 +50,7 @@ def in_bounds(r, c):
 def bfs_path(grid, start, goal):
     queue, parents = deque([start]), {start: None}
     while queue:
-        cell = queue.pop()
+        cell = queue.popleft()
         if cell == goal:
             break
         for dr, dc in DIRS.values():
@@ -68,6 +87,7 @@ class Game:
         self.reset()
 
     def reset(self):
+        PARTICLES.clear()
         self.level, self.score, self.lives, self.state = 1, 0, 3, "play"
         self.start_level()
 
@@ -155,6 +175,12 @@ class Game:
             enemy.cell = path[0]
 
     def update(self, dt, keys):
+        for p in PARTICLES[:]:
+            p["x"] += p["vx"] * dt
+            p["y"] += p["vy"] * dt
+            p["life"] -= dt
+            if p["life"] <= 0:
+                PARTICLES.remove(p)
         if self.state != "play":
             return
         self.time += dt
@@ -192,6 +218,8 @@ class Game:
             pygame.draw.circle(screen, color, (x, y), radius)
             pygame.draw.circle(screen, (255, 255, 255), (x - 4, y - 3), 3)
             pygame.draw.circle(screen, (255, 255, 255), (x + 4, y - 3), 3)
+        for p in PARTICLES:
+            pygame.draw.circle(screen, p["color"], (int(p["x"]), int(p["y"])), 4)
         px, py = self.player[1] * TILE + TILE // 2, self.player[0] * TILE + TILE // 2
         pygame.draw.circle(screen, (250, 250, 250), (px, py), 12)
         pygame.draw.rect(screen, (60, 120, 230), (px - 8, py - 12, 16, 8))
