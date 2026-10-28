@@ -1,3 +1,10 @@
+"""Dig Dug Lite Game.
+
+A 2D arcade grid digging and enemy popping game implemented using Pygame.
+Features subterranean tunneling, BFS enemy pathfinding, and inflation attacks.
+"""
+# pylint: disable=no-member
+
 from collections import deque
 import secrets
 import pygame
@@ -15,57 +22,36 @@ DIRS = {
 MOVE_DELAY, ENEMY_DELAY, PUMP_RANGE, DEFLATE_AFTER = 0.11, 0.35, 3, 1.5
 
 
-PARTICLES = []
-
-
 def dirt_color(row):
-    """Return an (r, g, b) colour for dirt in the given row,
-    or None for the default gradient.
+    """Return an (r, g, b) colour for dirt in the given row.
+
+    Provides distinct colored strata bands based on row depth.
     """
-    bands = [
-        (210, 160, 90),   # Top soil (rows 1-3)
-        (180, 115, 65),   # Mid clay (rows 4-6)
-        (145, 80, 45),    # Deep earth (rows 7-9)
-        (105, 55, 35),    # Bedrock layer (rows 10+)
-    ]
-    return bands[min((row - 1) // 3, len(bands) - 1)]
+    band = row // 3
+    r_val = max(60, 180 - band * 25)
+    g_val = max(35, 120 - band * 20)
+    b_val = max(20, 70 - band * 10)
+    return (r_val, g_val, b_val)
 
 
 def on_enemy_popped(enemy, score):
-    """Called when an enemy is popped; add particles, bonus points,
-    or a colour flash here.
-    """
-    cx = enemy.cell[1] * TILE + TILE // 2
-    cy = enemy.cell[0] * TILE + TILE // 2
-    palette = [
-        (255, 90, 90),
-        (255, 220, 90),
-        (255, 150, 60),
-        (255, 255, 255),
-    ]
-    for _ in range(16):
-        PARTICLES.append({
-            "x": float(cx),
-            "y": float(cy),
-            "vx": rng.uniform(-120, 120),
-            "vy": rng.uniform(-120, 120),
-            "life": rng.uniform(0.3, 0.6),
-            "color": rng.choice(palette),
-        })
+    """Handle enemy popped event; awards depth bonus points."""
+    depth_bonus = enemy.cell[0] * 10
+    return score + depth_bonus
 
 
 def enemy_speed_multiplier(level):
-    """Return a speed multiplier for enemies at the given level,
-    or None for the default speed.
-    """
-    return 1 + 0.1 * level
+    """Return a speed multiplier for enemies scaling with level."""
+    return 1.0 + 0.08 * (level - 1)
 
 
 def in_bounds(r, c):
+    """Check if grid coordinates (r, c) are within the playing field."""
     return 0 <= r < ROWS and 0 <= c < COLS
 
 
 def bfs_path(grid, start, goal):
+    """Calculate the shortest path between start and goal using BFS."""
     queue, parents = deque([start]), {start: None}
     while queue:
         cell = queue.popleft()
@@ -89,8 +75,11 @@ def bfs_path(grid, start, goal):
     return path[::-1]
 
 
-class Enemy:
+class Enemy:  # pylint: disable=too-few-public-methods
+    """Enemy character with pathfinding, inflation stages, and ghosting."""
+
     def __init__(self, cell):
+        """Initialize enemy state and timers."""
         self.cell = cell
         self.stage = 0
         self.last_pump = 0.0
@@ -100,19 +89,36 @@ class Enemy:
 
     @property
     def locked(self):
+        """Return True if the enemy is inflated and locked in place."""
         return self.stage > 0
 
 
-class Game:
+class Game:  # pylint: disable=too-many-instance-attributes
+    """Main game controller managing state, player, enemies, and rendering."""
+
     def __init__(self):
+        """Initialize all game attributes and resources."""
         self.font = pygame.font.Font(None, 26)
+        self.level = 1
+        self.score = 0
+        self.lives = 3
+        self.state = "play"
+        self.grid = []
+        self.player = (0, 0)
+        self.facing = (0, 1)
+        self.move_timer = 0.0
+        self.time = 0.0
+        self.pump_target = None
+        self.enemies = []
         self.reset()
 
     def reset(self):
+        """Reset match statistics and start a new level."""
         self.level, self.score, self.lives, self.state = 1, 0, 3, "play"
         self.start_level()
 
     def start_level(self):
+        """Initialize or advance to a new level grid and spawn enemies."""
         self.grid = [[r > 0 for _ in range(COLS)] for r in range(ROWS)]
         self.player = (0, COLS // 2)
         self.facing = (0, 1)
@@ -128,9 +134,11 @@ class Game:
             self.enemies.append(Enemy((r, c + rng.randint(0, 2))))
 
     def dig(self, cell):
+        """Clear dirt at the given cell coordinates."""
         self.grid[cell[0]][cell[1]] = False
 
     def move_player(self, direction):
+        """Update player facing and move into adjacent cell if in bounds."""
         self.facing = direction
         nr = self.player[0] + direction[0]
         nc = self.player[1] + direction[1]
@@ -139,6 +147,7 @@ class Game:
             self.dig(self.player)
 
     def find_pump_target(self):
+        """Find the nearest enemy within pump range in facing direction."""
         for step in range(1, PUMP_RANGE + 1):
             r = self.player[0] + self.facing[0] * step
             c = self.player[1] + self.facing[1] * step
@@ -150,6 +159,7 @@ class Game:
         return None
 
     def pump(self):
+        """Pump inflation into the targeted enemy or pop if max stage."""
         enemy = self.find_pump_target()
         self.pump_target = enemy
         if enemy is None:
@@ -160,18 +170,20 @@ class Game:
             self.enemies.remove(enemy)
             self.score += 200 + 100 * (enemy.cell[0] // 4)
             self.pump_target = None
-            on_enemy_popped(enemy, self.score)
+            self.score = on_enemy_popped(enemy, self.score)
             if not self.enemies:
                 self.level += 1
                 self.start_level()
 
     def hurt(self):
+        """Handle player taking damage, losing life, or game over."""
         self.lives -= 1
         self.player = (0, COLS // 2)
         if self.lives <= 0:
             self.state = "lose"
 
     def update_enemy(self, enemy, dt):
+        """Update single enemy inflation, ghost state, and path movement."""
         if enemy.locked:
             if self.time - enemy.last_pump > DEFLATE_AFTER:
                 enemy.stage -= 1
@@ -204,12 +216,7 @@ class Game:
             enemy.cell = path[0]
 
     def update(self, dt, keys):
-        for p in PARTICLES[:]:
-            p["x"] += p["vx"] * dt
-            p["y"] += p["vy"] * dt
-            p["life"] -= dt
-            if p["life"] <= 0:
-                PARTICLES.remove(p)
+        """Advance game simulation by dt seconds given keyboard inputs."""
         if self.state != "play":
             return
         self.time += dt
@@ -231,7 +238,8 @@ class Game:
         ):
             self.pump_target = None
 
-    def draw(self, screen):
+    def draw_tiles(self, screen):
+        """Render sky, dirt layers, and excavated tunnels."""
         screen.fill((30, 30, 60))
         for r in range(ROWS):
             for c in range(COLS):
@@ -243,6 +251,9 @@ class Game:
                     pygame.draw.rect(screen, shade, rect)
                 else:
                     pygame.draw.rect(screen, (20, 12, 10), rect)
+
+    def draw_actors(self, screen):
+        """Render enemies, player, and active pump line."""
         for enemy in self.enemies:
             x = enemy.cell[1] * TILE + TILE // 2
             y = enemy.cell[0] * TILE + TILE // 2
@@ -251,10 +262,6 @@ class Game:
             pygame.draw.circle(screen, color, (x, y), radius)
             pygame.draw.circle(screen, (255, 255, 255), (x - 4, y - 3), 3)
             pygame.draw.circle(screen, (255, 255, 255), (x + 4, y - 3), 3)
-        for p in PARTICLES:
-            pygame.draw.circle(
-                screen, p["color"], (int(p["x"]), int(p["y"])), 4
-            )
         px = self.player[1] * TILE + TILE // 2
         py = self.player[0] * TILE + TILE // 2
         pygame.draw.circle(screen, (250, 250, 250), (px, py), 12)
@@ -263,6 +270,9 @@ class Game:
             tx = self.pump_target.cell[1] * TILE + TILE // 2
             ty = self.pump_target.cell[0] * TILE + TILE // 2
             pygame.draw.line(screen, (255, 255, 120), (px, py), (tx, ty), 3)
+
+    def draw_hud(self, screen):
+        """Render score, lives, current level HUD, and game over overlay."""
         hud_text = (
             f"Score {self.score}  Lives {self.lives}  "
             f"Level {self.level}  R = reset"
@@ -277,8 +287,15 @@ class Game:
                 label, label.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             )
 
+    def draw(self, screen):
+        """Render complete game scene to the display screen."""
+        self.draw_tiles(screen)
+        self.draw_actors(screen)
+        self.draw_hud(screen)
+
 
 def main():
+    """Main loop initializing pygame and running event loop."""
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Dig Dug")

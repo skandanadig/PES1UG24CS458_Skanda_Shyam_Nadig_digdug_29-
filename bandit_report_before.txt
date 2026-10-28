@@ -1,0 +1,81 @@
+Run started:2026-10-28 12:53:17.899982
+
+Test results:
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_calls.html#b311-random
+   Location: ./game.py:56:26
+55	        self.last_pump = 0.0
+56	        self.step_timer = random.uniform(0, ENEMY_DELAY)
+57	        self.ghost_timer = random.uniform(6, 10)
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_calls.html#b311-random
+   Location: ./game.py:57:27
+56	        self.step_timer = random.uniform(0, ENEMY_DELAY)
+57	        self.ghost_timer = random.uniform(6, 10)
+58	        self.ghost = False
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_calls.html#b311-random
+   Location: ./game.py:83:19
+82	        for _ in range(3 + self.level):
+83	            r, c = random.randint(4, ROWS - 2), random.randint(1, COLS - 3)
+84	            for dc in range(3):
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_calls.html#b311-random
+   Location: ./game.py:83:48
+82	        for _ in range(3 + self.level):
+83	            r, c = random.randint(4, ROWS - 2), random.randint(1, COLS - 3)
+84	            for dc in range(3):
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_calls.html#b311-random
+   Location: ./game.py:86:46
+85	                self.grid[r][c + dc] = False
+86	            self.enemies.append(Enemy((r, c + random.randint(0, 2))))
+87	
+
+--------------------------------------------------
+>> Issue: [B311:blacklist] Standard pseudo-random generators are not suitable for security/cryptographic purposes.
+   Severity: Low   Confidence: High
+   CWE: CWE-330 (https://cwe.mitre.org/data/definitions/330.html)
+   More Info: https://bandit.readthedocs.io/en/1.8.6/blacklists/blacklist_calls.html#b311-random
+   Location: ./game.py:139:56
+138	            enemy.ghost = not enemy.ghost
+139	            enemy.ghost_timer = 4.0 if enemy.ghost else random.uniform(6, 10)
+140	            if not enemy.ghost:
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 200
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 6
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 6
+Files skipped (0):
