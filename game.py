@@ -1,13 +1,17 @@
+from collections import deque
 import secrets
+import pygame
 
 rng = secrets.SystemRandom()
-from collections import deque
-
-import pygame
 
 TILE, COLS, ROWS = 32, 20, 14
 WIDTH, HEIGHT = COLS * TILE, ROWS * TILE + 36
-DIRS = {pygame.K_UP: (-1, 0), pygame.K_DOWN: (1, 0), pygame.K_LEFT: (0, -1), pygame.K_RIGHT: (0, 1)}
+DIRS = {
+    pygame.K_UP: (-1, 0),
+    pygame.K_DOWN: (1, 0),
+    pygame.K_LEFT: (0, -1),
+    pygame.K_RIGHT: (0, 1),
+}
 MOVE_DELAY, ENEMY_DELAY, PUMP_RANGE, DEFLATE_AFTER = 0.11, 0.35, 3, 1.5
 
 
@@ -15,7 +19,9 @@ PARTICLES = []
 
 
 def dirt_color(row):
-    """Return an (r, g, b) colour for dirt in the given row, or None for the default gradient."""
+    """Return an (r, g, b) colour for dirt in the given row,
+    or None for the default gradient.
+    """
     bands = [
         (210, 160, 90),   # Top soil (rows 1-3)
         (180, 115, 65),   # Mid clay (rows 4-6)
@@ -26,9 +32,17 @@ def dirt_color(row):
 
 
 def on_enemy_popped(enemy, score):
-    """Called when an enemy is popped; add particles, bonus points, or a colour flash here."""
+    """Called when an enemy is popped; add particles, bonus points,
+    or a colour flash here.
+    """
     cx = enemy.cell[1] * TILE + TILE // 2
     cy = enemy.cell[0] * TILE + TILE // 2
+    palette = [
+        (255, 90, 90),
+        (255, 220, 90),
+        (255, 150, 60),
+        (255, 255, 255),
+    ]
     for _ in range(16):
         PARTICLES.append({
             "x": float(cx),
@@ -36,12 +50,14 @@ def on_enemy_popped(enemy, score):
             "vx": rng.uniform(-120, 120),
             "vy": rng.uniform(-120, 120),
             "life": rng.uniform(0.3, 0.6),
-            "color": rng.choice([(255, 90, 90), (255, 220, 90), (255, 150, 60), (255, 255, 255)]),
+            "color": rng.choice(palette),
         })
 
 
 def enemy_speed_multiplier(level):
-    """Return a speed multiplier for enemies at the given level, or None for the default speed."""
+    """Return a speed multiplier for enemies at the given level,
+    or None for the default speed.
+    """
     return 1 + 0.1 * level
 
 
@@ -57,7 +73,11 @@ def bfs_path(grid, start, goal):
             break
         for dr, dc in DIRS.values():
             nxt = (cell[0] + dr, cell[1] + dc)
-            if in_bounds(*nxt) and not grid[nxt[0]][nxt[1]] and nxt not in parents:
+            if (
+                in_bounds(*nxt)
+                and not grid[nxt[0]][nxt[1]]
+                and nxt not in parents
+            ):
                 parents[nxt] = cell
                 queue.append(nxt)
     if goal not in parents:
@@ -89,7 +109,6 @@ class Game:
         self.reset()
 
     def reset(self):
-        PARTICLES.clear()
         self.level, self.score, self.lives, self.state = 1, 0, 3, "play"
         self.start_level()
 
@@ -102,7 +121,8 @@ class Game:
         self.pump_target = None
         self.enemies = []
         for _ in range(3 + self.level):
-            r, c = rng.randint(4, ROWS - 2), rng.randint(1, COLS - 3)
+            r = rng.randint(4, ROWS - 2)
+            c = rng.randint(1, COLS - 3)
             for dc in range(3):
                 self.grid[r][c + dc] = False
             self.enemies.append(Enemy((r, c + rng.randint(0, 2))))
@@ -112,14 +132,16 @@ class Game:
 
     def move_player(self, direction):
         self.facing = direction
-        nr, nc = self.player[0] + direction[0], self.player[1] + direction[1]
+        nr = self.player[0] + direction[0]
+        nc = self.player[1] + direction[1]
         if in_bounds(nr, nc):
             self.player = (nr, nc)
             self.dig(self.player)
 
     def find_pump_target(self):
         for step in range(1, PUMP_RANGE + 1):
-            r, c = self.player[0] + self.facing[0] * step, self.player[1] + self.facing[1] * step
+            r = self.player[0] + self.facing[0] * step
+            c = self.player[1] + self.facing[1] * step
             if not in_bounds(r, c) or self.grid[r][c]:
                 return None
             for enemy in self.enemies:
@@ -164,13 +186,18 @@ class Game:
         enemy.step_timer -= dt
         if enemy.step_timer > 0:
             return
-        enemy.step_timer = ENEMY_DELAY * (1.6 if enemy.ghost else 1) / (enemy_speed_multiplier(self.level) or 1)
+        speed_mult = enemy_speed_multiplier(self.level) or 1
+        speed_factor = 1.6 if enemy.ghost else 1.0
+        enemy.step_timer = (ENEMY_DELAY * speed_factor) / speed_mult
         if enemy.ghost:
-            dr, dc = self.player[0] - enemy.cell[0], self.player[1] - enemy.cell[1]
+            dr = self.player[0] - enemy.cell[0]
+            dc = self.player[1] - enemy.cell[1]
             if abs(dr) >= abs(dc) and dr:
-                enemy.cell = (enemy.cell[0] + (1 if dr > 0 else -1), enemy.cell[1])
+                step_r = 1 if dr > 0 else -1
+                enemy.cell = (enemy.cell[0] + step_r, enemy.cell[1])
             elif dc:
-                enemy.cell = (enemy.cell[0], enemy.cell[1] + (1 if dc > 0 else -1))
+                step_c = 1 if dc > 0 else -1
+                enemy.cell = (enemy.cell[0], enemy.cell[1] + step_c)
             return
         path = bfs_path(self.grid, enemy.cell, self.player)
         if path:
@@ -198,7 +225,10 @@ class Game:
             if enemy.cell == self.player and not enemy.locked:
                 self.hurt()
                 break
-        if self.pump_target and (self.pump_target not in self.enemies or not self.pump_target.locked):
+        if self.pump_target and (
+            self.pump_target not in self.enemies
+            or not self.pump_target.locked
+        ):
             self.pump_target = None
 
     def draw(self, screen):
@@ -214,25 +244,38 @@ class Game:
                 else:
                     pygame.draw.rect(screen, (20, 12, 10), rect)
         for enemy in self.enemies:
-            x, y = enemy.cell[1] * TILE + TILE // 2, enemy.cell[0] * TILE + TILE // 2
+            x = enemy.cell[1] * TILE + TILE // 2
+            y = enemy.cell[0] * TILE + TILE // 2
             radius = 10 + enemy.stage * 4
             color = (230, 230, 240) if enemy.ghost else (230, 70, 70)
             pygame.draw.circle(screen, color, (x, y), radius)
             pygame.draw.circle(screen, (255, 255, 255), (x - 4, y - 3), 3)
             pygame.draw.circle(screen, (255, 255, 255), (x + 4, y - 3), 3)
         for p in PARTICLES:
-            pygame.draw.circle(screen, p["color"], (int(p["x"]), int(p["y"])), 4)
-        px, py = self.player[1] * TILE + TILE // 2, self.player[0] * TILE + TILE // 2
+            pygame.draw.circle(
+                screen, p["color"], (int(p["x"]), int(p["y"])), 4
+            )
+        px = self.player[1] * TILE + TILE // 2
+        py = self.player[0] * TILE + TILE // 2
         pygame.draw.circle(screen, (250, 250, 250), (px, py), 12)
         pygame.draw.rect(screen, (60, 120, 230), (px - 8, py - 12, 16, 8))
         if self.pump_target:
-            tx, ty = self.pump_target.cell[1] * TILE + TILE // 2, self.pump_target.cell[0] * TILE + TILE // 2
+            tx = self.pump_target.cell[1] * TILE + TILE // 2
+            ty = self.pump_target.cell[0] * TILE + TILE // 2
             pygame.draw.line(screen, (255, 255, 120), (px, py), (tx, ty), 3)
-        hud = self.font.render(f"Score {self.score}  Lives {self.lives}  Level {self.level}  R = reset", True, (240, 240, 240))
+        hud_text = (
+            f"Score {self.score}  Lives {self.lives}  "
+            f"Level {self.level}  R = reset"
+        )
+        hud = self.font.render(hud_text, True, (240, 240, 240))
         screen.blit(hud, (10, ROWS * TILE + 8))
         if self.state == "lose":
-            label = self.font.render("GAME OVER - Press R", True, (255, 255, 120))
-            screen.blit(label, label.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+            label = self.font.render(
+                "GAME OVER - Press R", True, (255, 255, 120)
+            )
+            screen.blit(
+                label, label.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            )
 
 
 def main():
@@ -247,7 +290,11 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and game.state == "play":
+            elif (
+                event.type == pygame.KEYDOWN
+                and event.key == pygame.K_SPACE
+                and game.state == "play"
+            ):
                 game.pump()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 game.reset()
