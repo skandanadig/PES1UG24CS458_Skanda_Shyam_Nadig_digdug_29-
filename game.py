@@ -1,4 +1,6 @@
-import random
+import secrets
+
+rng = secrets.SystemRandom()
 from collections import deque
 
 import pygame
@@ -31,10 +33,10 @@ def on_enemy_popped(enemy, score):
         PARTICLES.append({
             "x": float(cx),
             "y": float(cy),
-            "vx": random.uniform(-120, 120),
-            "vy": random.uniform(-120, 120),
-            "life": random.uniform(0.3, 0.6),
-            "color": random.choice([(255, 90, 90), (255, 220, 90), (255, 150, 60), (255, 255, 255)]),
+            "vx": rng.uniform(-120, 120),
+            "vy": rng.uniform(-120, 120),
+            "life": rng.uniform(0.3, 0.6),
+            "color": rng.choice([(255, 90, 90), (255, 220, 90), (255, 150, 60), (255, 255, 255)]),
         })
 
 
@@ -72,8 +74,8 @@ class Enemy:
         self.cell = cell
         self.stage = 0
         self.last_pump = 0.0
-        self.step_timer = random.uniform(0, ENEMY_DELAY)
-        self.ghost_timer = random.uniform(6, 10)
+        self.step_timer = rng.uniform(0, ENEMY_DELAY)
+        self.ghost_timer = rng.uniform(6, 10)
         self.ghost = False
 
     @property
@@ -100,10 +102,10 @@ class Game:
         self.pump_target = None
         self.enemies = []
         for _ in range(3 + self.level):
-            r, c = random.randint(4, ROWS - 2), random.randint(1, COLS - 3)
+            r, c = rng.randint(4, ROWS - 2), rng.randint(1, COLS - 3)
             for dc in range(3):
                 self.grid[r][c + dc] = False
-            self.enemies.append(Enemy((r, c + random.randint(0, 2))))
+            self.enemies.append(Enemy((r, c + rng.randint(0, 2))))
 
     def dig(self, cell):
         self.grid[cell[0]][cell[1]] = False
@@ -156,7 +158,7 @@ class Game:
         enemy.ghost_timer -= dt
         if enemy.ghost_timer <= 0:
             enemy.ghost = not enemy.ghost
-            enemy.ghost_timer = 4.0 if enemy.ghost else random.uniform(6, 10)
+            enemy.ghost_timer = 4.0 if enemy.ghost else rng.uniform(6, 10)
             if not enemy.ghost:
                 self.grid[enemy.cell[0]][enemy.cell[1]] = False
         enemy.step_timer -= dt
